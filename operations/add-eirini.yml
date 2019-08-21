@@ -2,7 +2,7 @@
 - type: replace
   path: /instance_groups/-
   value:
-    name: eirini
+    name: opi
     release: eirini
     azs: [z1]
     instances: 1
