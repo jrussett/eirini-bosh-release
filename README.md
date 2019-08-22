@@ -3,24 +3,46 @@
 This is a BOSH release for [eirini](https://code.cloudfoundry.org/eirini).
 
 ## Deploying CF+Eirini with BOSH
-
 1. Ensure you have the following utilities:
-  - `jq`
-  - `bosh`
-  - `credhub`
-  - `kubectl`
-1. Create a k8s cluster and add it as the current context to your kubectl config.
-1. Ensure that the BOSH & CredHub CLI connection environment variables are properly set.
-1. Run `scripts/pre-deploy-configure-k8s.sh`
-1. Create and upload the following BOSH releases:
-    - [`bits-service-release`](https://github.com/cloudfoundry-incubator/bits-service-release)
-        - At least git tag > `2.26.0-dev.8`
-    - This BOSH release
-1. Deploy `cf-deployment` with the following ops files (in this order):
-    - `<CF_DEPLOYMENT>/operations/bits-service/use-bits-service.yml`
-    - `eirini-bosh-release/operations/add-eirini.yml`
-1. Run `scripts/post-deploy-configure-k8s.sh <LB_CA_CERT_VALUE> <SYSTEM_DOMAIN>`
-    - The value of `LB_CA_CERT_VALUE` must be the CA of the cert of whatever in your deployment is terminating TLS (usually either an IaaS load balancer or the gorouter itself)
+  - [`bosh`](https://bosh.io/docs/cli-v2-install/)
+  - [`bosh-bootloader`](https://github.com/cloudfoundry/bosh-bootloader#prerequisites)
+
+1. Create a GCP service account for use by BBL (BOSH Bootloader): [Getting
+   Started: GCP # Create a Service
+   Account](https://github.com/cloudfoundry/bosh-bootloader/blob/master/docs/getting-started-gcp.md#create-a-service-account)
+
+1. Create and bootstrap the directory to store your BBL (BOSH Bootloader) state:
+    ```
+    mkdir -p ~/path/to/envs/new_environment
+    pushd ~/path/to/envs/new_environment
+
+    # export BBL_IAAS=gcp
+    # export BBL_...
+    bbl plan
+    ```
+
+ <!-- TODO: name the plan patches directory? -->
+1. Apply the `gcp` plan patch to the BBL state dir (defaults to
+   `new_environment/bbl_state`):
+    ```
+    cp -R ~/path/to/eirini-bosh-release/plan-patches/gcp/. ~/path/to/envs/new_environment/bbl_state
+    ```
+1. Deploy CF
+    ```
+    ./deploy.sh
+    ```
+
+1. Create a new DNS record
+       DNS Name: `*.$ENVIRONMENT.tld.`
+       Resource Record Type: `A`
+       TTL: 5 minutes
+       IPv4 addresses: IP of the router load balancer, e.g. `bbl outputs | grep
+       router_lb_ip`
+
+1. Run the post-deploy errands:
+    ```
+    bosh -d cf run-errand configure-eirini-bosh
+    ```
 
 ## Contributing
 
